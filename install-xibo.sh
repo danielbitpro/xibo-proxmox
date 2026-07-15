@@ -54,7 +54,6 @@ apt install -y \
     chrony \
     htop \
     nano \
-    pico \
     rsync \
     openssh-server
 
