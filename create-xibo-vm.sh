@@ -93,10 +93,12 @@ fi
 # ====================== CREATE VM ======================
 msg_info "Creating VM $VMID ($VMNAME)..."
 
+# FIXED: Added explicit '--cpu x86-64-v2' to support modern software like MySQL 8.4
 qm create "$VMID" \
     --name "$VMNAME" \
     --cores "$CPU_CORES" \
     --memory "$RAM" \
+    --cpu x86-64-v2 \
     --net0 "virtio,bridge=${BRIDGE}" \
     --scsihw virtio-scsi-pci \
     --ostype l26 \
@@ -110,7 +112,7 @@ qm importdisk "$VMID" "$TEMPLATE_DIR/$CLOUD_IMAGE_NAME" "$STORAGE"
 qm set "$VMID" --scsi0 "$STORAGE:vm-$VMID-disk-0,discard=on"
 qm set "$VMID" --boot order=scsi0
 
-# RESIZE FIXED HERE: Apply the target size specified by the user
+# Apply the target size specified by the user
 msg_info "Resizing root disk to ${DISK_SIZE}G..."
 qm resize "$VMID" scsi0 "${DISK_SIZE}G"
 
