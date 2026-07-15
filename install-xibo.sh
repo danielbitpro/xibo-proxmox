@@ -4,7 +4,7 @@
 # For Ubuntu 24.04 (Proxmox VE VMs or bare metal)
 # Includes MySQL 8.4 compatibility fixes for Xibo v4
 #
-# Run this script inside the Ubuntu VM after creation.
+# Run this script inside the Ubuntu VM
 #
 
 set -euo pipefail
@@ -28,7 +28,6 @@ echo -e "${BLUE}          Ubuntu 24.04                 ${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Must run as root
 if [[ $EUID -ne 0 ]]; then
     msg_error "This script must be run as root or with sudo."
 fi
@@ -45,17 +44,30 @@ if [[ -z "$MYSQL_PASS" || -z "$ADMIN_PASS" ]]; then
     msg_error "Passwords cannot be empty."
 fi
 
-# Variables
-XIBO_BASE_DIR="/opt/xibo"
-INSTALL_DIR=""
+# ====================== SYSTEM UPDATE & ESSENTIAL PACKAGES ======================
+msg_info "Updating system and installing essential packages..."
 
-msg_info "Updating system..."
 apt update && apt upgrade -y -qq
 
+apt install -y \
+    qemu-guest-agent \
+    chrony \
+    htop \
+    nano \
+    pico \
+    rsync \
+    openssh-server
+
+# Enable and start qemu-guest-agent
+systemctl enable --now qemu-guest-agent
+
+msg_ok "Essential packages installed."
+
+# ====================== DOCKER INSTALLATION ======================
 msg_info "Installing Docker and prerequisites..."
+
 apt install -y ca-certificates curl gnupg lsb-release unzip
 
-# Docker repository
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
@@ -67,27 +79,24 @@ echo \
 apt update -qq
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Add user to docker group
 if [[ -n "${SUDO_USER:-}" ]]; then
     usermod -aG docker "$SUDO_USER"
-    msg_warn "User '$SUDO_USER' added to docker group. Please log out and back in after installation."
+    msg_warn "User '$SUDO_USER' added to docker group. Log out and back in after installation."
 fi
 
+# ====================== XIBO INSTALLATION ======================
 msg_info "Downloading latest Xibo Docker package..."
-mkdir -p "$XIBO_BASE_DIR"
-cd "$XIBO_BASE_DIR"
+
+mkdir -p /opt/xibo
+cd /opt/xibo
 
 curl -L -o xibo-docker.tar.gz https://xibosignage.com/api/downloads/cms
 tar -xzf xibo-docker.tar.gz
 
-# Find the extracted directory
 INSTALL_DIR=$(find . -maxdepth 1 -type d -name "xibo-docker-*" | head -n 1)
-if [[ -z "$INSTALL_DIR" ]]; then
-    msg_error "Failed to find extracted Xibo Docker directory."
-fi
 cd "$INSTALL_DIR"
 
-msg_info "Creating optimized docker-compose.yml with MySQL 8.4 fix..."
+msg_info "Creating optimized docker-compose.yml..."
 
 cat > docker-compose.yml << 'COMPOSE_EOF'
 version: "3.8"
@@ -141,7 +150,7 @@ services:
     restart: always
 COMPOSE_EOF
 
-msg_info "Creating config.env with your password..."
+msg_info "Creating config.env..."
 
 cat > config.env << EOF
 MYSQL_ROOT_PASSWORD=${MYSQL_PASS}
@@ -150,10 +159,10 @@ MYSQL_USER=cms
 MYSQL_DATABASE=cms
 EOF
 
-msg_info "Cleaning any previous database data..."
+msg_info "Cleaning previous database data..."
 rm -rf ./shared/db 2>/dev/null || true
 
-msg_info "Starting Xibo containers (this may take a minute)..."
+msg_info "Starting Xibo containers..."
 docker compose up -d
 
 echo ""
@@ -175,15 +184,10 @@ echo ""
 echo "4. **Change the admin password immediately** to:"
 echo "   ${ADMIN_PASS}"
 echo ""
-echo -e "${YELLOW}5. Set XMR Public Address (important for Android players):${NC}"
+echo -e "${YELLOW}5. Set XMR Public Address:${NC}"
 echo "   Go to: Administration → Settings → Displays"
 echo "   Set XMR Public Address to:"
 echo "   tcp://$(hostname -I | awk '{print $1}'):9505"
-echo ""
-echo -e "${YELLOW}Recommended after setup:${NC}"
-echo "- Configure nginx reverse proxy + SSL"
-echo "- Set up firewall rules"
-echo "- Test with one Android player first"
 echo ""
 echo -e "${GREEN}Your Xibo CMS is now running at: http://$(hostname -I | awk '{print $1}')${NC}"
 echo ""
