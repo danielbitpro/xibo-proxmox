@@ -77,9 +77,10 @@ if [[ "$NET_TYPE" == "static" ]]; then
 fi
 
 # ====================== CLOUD IMAGE ======================
-CLOUD_IMAGE_URL="https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img"
+CLOUD_IMAGE_URL="https://ubuntu.com"
 CLOUD_IMAGE_NAME="ubuntu-24.04-server-cloudimg-amd64.img"
 TEMPLATE_DIR="/var/lib/vz/template/iso"
+SNIPPET_DIR="/var/lib/vz/snippets"
 
 msg_info "Downloading Ubuntu 24.04 cloud image (if not present)..."
 mkdir -p "$TEMPLATE_DIR"
@@ -109,7 +110,7 @@ qm importdisk "$VMID" "$TEMPLATE_DIR/$CLOUD_IMAGE_NAME" "$STORAGE"
 qm set "$VMID" --scsi0 "$STORAGE:vm-$VMID-disk-0,discard=on"
 qm set "$VMID" --boot order=scsi0
 
-# Add cloud-init drive
+# Add cloud-init drive targeting user selected storage pool
 qm set "$VMID" --ide2 "$STORAGE:cloudinit"
 
 # Apply static IP if selected
@@ -120,14 +121,25 @@ fi
 # ====================== CLOUD-INIT USER CONFIG ======================
 msg_info "Configuring cloud-init user and SSH..."
 
+# Set core user parameters
 qm set "$VMID" --ciuser "$VM_USER"
 qm set "$VMID" --cipassword "$VM_PASS"
 
-# Enable SSH password authentication (default is disabled in cloud images)
-qm set "$VMID" --cicustom "user=cloud-init:ssh_pwauth=true"
+# Create a local snippet file to force password authentication on Ubuntu 24.04
+mkdir -p "$SNIPPET_DIR"
+cat << 'EOF' > "$SNIPPET_DIR/xibo-ssh-patch.yaml"
+#cloud-config
+ssh_pwauth: true
+EOF
 
-# Add SSH key if available (optional)
+# Pass the custom snippet file using Proxmox's correct syntax
+qm set "$VMID" --cicustom "user=local:snippets/xibo-ssh-patch.yaml"
+
+# Add local root SSH key if available (optional)
 qm set "$VMID" --sshkeys ~/.ssh/authorized_keys 2>/dev/null || true
+
+# Force cloud-init to regenerate metadata cleanly before boot
+qm cloudinit update "$VMID"
 
 # Start the VM
 msg_info "Starting VM $VMID..."
