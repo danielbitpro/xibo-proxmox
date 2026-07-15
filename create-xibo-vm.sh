@@ -2,8 +2,9 @@
 #
 # Create Xibo VM - Proxmox VE
 # Creates an Ubuntu 24.04 VM using cloud image + cloud-init
+# Includes option for Static IP and SSH password login
 #
-# Run this on the Proxmox host
+# Run this script on the Proxmox host
 #
 
 set -euo pipefail
@@ -46,7 +47,7 @@ DISK_SIZE=${DISK_SIZE:-64}
 read -p "Storage (e.g. local-lvm, local-zfs): " STORAGE
 read -p "Network Bridge (default vmbr0): " BRIDGE
 BRIDGE=${BRIDGE:-vmbr0}
-read -p "Username (default ubuntu): " VM_USER
+read -p "Username for the VM (default ubuntu): " VM_USER
 VM_USER=${VM_USER:-ubuntu}
 read -sp "Password for the VM user: " VM_PASS
 echo ""
@@ -59,17 +60,17 @@ if qm list | awk '{print $1}' | grep -q "^${VMID}$"; then
     msg_error "VM ID $VMID already exists."
 fi
 
-# ====================== NETWORK ======================
+# ====================== NETWORK CONFIG ======================
 echo ""
-read -p "Network: DHCP or Static? [dhcp/static] (default: dhcp): " NET_TYPE
+read -p "Network configuration? [dhcp/static] (default: dhcp): " NET_TYPE
 NET_TYPE=${NET_TYPE:-dhcp}
 
 IPCONFIG=""
 
 if [[ "$NET_TYPE" == "static" ]]; then
-    read -p "IP Address with CIDR (e.g. 192.168.1.50/24): " IP_CIDR
-    read -p "Gateway (e.g. 192.168.1.1): " GATEWAY
-    read -p "DNS servers (default: 8.8.8.8,1.1.1.1): " DNS_SERVERS
+    read -p "Enter IP address with CIDR (e.g. 192.168.1.50/24): " IP_CIDR
+    read -p "Enter Gateway (e.g. 192.168.1.1): " GATEWAY
+    read -p "Enter DNS servers (default: 8.8.8.8,1.1.1.1): " DNS_SERVERS
     DNS_SERVERS=${DNS_SERVERS:-8.8.8.8,1.1.1.1}
 
     IPCONFIG="ip=${IP_CIDR},gw=${GATEWAY}"
@@ -100,25 +101,33 @@ qm create "$VMID" \
     --ostype l26 \
     --agent 1
 
-# Import cloud image as disk
-msg_info "Importing cloud image as disk..."
+# Import cloud image
+msg_info "Importing Ubuntu cloud image..."
 qm importdisk "$VMID" "$TEMPLATE_DIR/$CLOUD_IMAGE_NAME" "$STORAGE"
 
-# Attach imported disk as scsi0 and make it bootable
+# Attach disk and set boot order
 qm set "$VMID" --scsi0 "$STORAGE:vm-$VMID-disk-0,discard=on"
 qm set "$VMID" --boot order=scsi0
 
 # Add cloud-init drive
 qm set "$VMID" --ide2 "$STORAGE:cloudinit"
 
-# Apply IP config if static
+# Apply static IP if selected
 if [[ "$NET_TYPE" == "static" && -n "$IPCONFIG" ]]; then
     qm set "$VMID" --ipconfig0 "$IPCONFIG"
 fi
 
-# Cloud-init user settings
+# ====================== CLOUD-INIT USER CONFIG ======================
+msg_info "Configuring cloud-init user and SSH..."
+
 qm set "$VMID" --ciuser "$VM_USER"
 qm set "$VMID" --cipassword "$VM_PASS"
+
+# Enable SSH password authentication (default is disabled in cloud images)
+qm set "$VMID" --ci-custom "user=cloud-init:ssh_pwauth=true"
+
+# Add SSH key if available (optional)
+qm set "$VMID" --sshkeys ~/.ssh/authorized_keys 2>/dev/null || true
 
 # Start the VM
 msg_info "Starting VM $VMID..."
@@ -140,8 +149,8 @@ if [[ "$NET_TYPE" == "static" ]]; then
 fi
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Wait 1-2 minutes for cloud-init to finish setup"
-echo "2. Find the VM IP (check Proxmox console or DHCP server)"
-echo "3. SSH into the VM and run the Xibo installer"
+echo "1. Wait 1–2 minutes for cloud-init to complete"
+echo "2. SSH into the VM using the username and password you set"
+echo "3. Run the Xibo installer script inside the VM"
 echo ""
 msg_ok "VM is ready."
