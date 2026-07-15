@@ -133,7 +133,7 @@ ssh_pwauth: True
 chpasswd:
   list: |
     ${VM_USER}:${VM_PASS}
-  expire: True
+  expire: False
 EOF
 
 # Attach the custom snippet using the Proxmox 9 syntax
