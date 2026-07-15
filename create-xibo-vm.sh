@@ -99,13 +99,13 @@ msg_info "Configuring cloud-init..."
 qm set "$VMID" --ciuser "$VM_USER"
 qm set "$VMID" --cipassword "$VM_PASS"
 
-# Enable SSH password authentication using file method (more compatible)
+# Enable SSH password authentication (correct syntax)
 cat > /tmp/user-data << EOF
 #cloud-config
 ssh_pwauth: true
 EOF
 
-qm set "$VMID" --ci-custom "user=cloud-init:/tmp/user-data"
+qm set "$VMID" --cicustom "user=cloud-init:/tmp/user-data"
 
 # Start VM
 msg_info "Starting VM..."
@@ -118,7 +118,7 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Wait 1-2 minutes for cloud-init to finish"
-echo "2. SSH into the VM using username '$VM_USER' and your password"
+echo "2. SSH into the VM using the username and password you set"
 echo "3. Run the Xibo installer inside the VM"
 echo ""
 msg_ok "VM is ready."
