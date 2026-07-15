@@ -125,21 +125,22 @@ msg_info "Configuring cloud-init user and SSH..."
 qm set "$VMID" --ciuser "$VM_USER"
 qm set "$VMID" --cipassword "$VM_PASS"
 
-# Create a local snippet file that overrides Ubuntu's restrictive SSH configurations
+# Create a local snippet file that writes a high-priority override config
+# This stops Ubuntu 24.04 from prioritizing keys over passwords
 mkdir -p "$SNIPPET_DIR"
 cat << 'EOF' > "$SNIPPET_DIR/xibo-ssh-patch.yaml"
 #cloud-config
 ssh_pwauth: true
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-enable-password-auth.conf
+    content: |
+      PasswordAuthentication yes
 runcmd:
-  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config.d/*.conf
-  - systemctl restart sshd
+  - systemctl restart ssh
 EOF
 
 # Pass the custom snippet file using Proxmox's correct syntax
 qm set "$VMID" --cicustom "user=local:snippets/xibo-ssh-patch.yaml"
-
-# Add local root SSH key if available (optional)
-qm set "$VMID" --sshkeys ~/.ssh/authorized_keys 2>/dev/null || true
 
 # Force cloud-init to regenerate metadata cleanly before boot
 qm cloudinit update "$VMID"
