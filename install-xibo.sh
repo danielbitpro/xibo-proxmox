@@ -4,7 +4,7 @@
 # For Ubuntu 24.04 (Proxmox VE VMs or bare metal)
 # Includes MySQL 8.4 compatibility fixes for Xibo v4
 #
-# Run this script inside the Ubuntu VM
+# Run this script inside a fresh Ubuntu VM
 #
 
 set -euo pipefail
@@ -24,7 +24,7 @@ msg_error(){ echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}   Xibo Self-Hosted Docker Installer   ${NC}"
-echo -e "${BLUE}          Ubuntu 24.04                 ${NC}"
+echo -e "${BLUE}          Ubuntu 24.04 (Native)        ${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -36,7 +36,7 @@ fi
 echo -e "${YELLOW}Please enter the required passwords:${NC}"
 read -sp "MySQL password for user 'cms': " MYSQL_PASS
 echo ""
-read -sp "Xibo admin password (for after first login): " ADMIN_PASS
+read -sp "Xibo admin password (desired custom password): " ADMIN_PASS
 echo ""
 echo ""
 
@@ -55,6 +55,11 @@ apt install -y \
     htop \
     nano \
     rsync \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    unzip
 
 # Enable and start qemu-guest-agent
 systemctl enable --now qemu-guest-agent
@@ -62,25 +67,16 @@ systemctl enable --now qemu-guest-agent
 msg_ok "Essential packages installed."
 
 # ====================== DOCKER INSTALLATION ======================
-msg_info "Installing Docker and prerequisites..."
+msg_info "Installing Docker via native Ubuntu package mirrors..."
 
-apt install -y ca-certificates curl gnupg lsb-release unzip
+# Using native canonical repository packages to bypass 404 paths and package locks
+apt-get update -qq
+apt-get install -y docker.io docker-compose-v2
 
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-chmod a+r /etc/apt/keyrings/docker.gpg
-
-# FIXED: Explicitly targeting 'ubuntu' instead of using native '$(lsb_release -cs)' which breaks paths
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  ubuntu stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-apt update -qq
-apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
+# Configure group permissions for non-root management
 if [[ -n "${SUDO_USER:-}" ]]; then
     usermod -aG docker "$SUDO_USER"
-    msg_warn "User '$SUDO_USER' added to docker group. Session reload handled internally."
+    msg_warn "User '$SUDO_USER' added to docker group."
 fi
 
 # ====================== XIBO INSTALLATION ======================
@@ -89,7 +85,7 @@ msg_info "Downloading latest Xibo Docker package..."
 mkdir -p /opt/xibo
 cd /opt/xibo
 
-curl -L -o xibo-docker.tar.gz https://xibosignage.com/api/downloads/cms
+curl -L -o xibo-docker.tar.gz https://xibosignage.com
 tar -xzf xibo-docker.tar.gz
 
 INSTALL_DIR=$(find . -maxdepth 1 -type d -name "xibo-docker-*" | head -n 1)
@@ -176,11 +172,11 @@ echo ""
 echo "2. Open your browser and go to:"
 echo "   http://$(hostname -I | awk '{print $1}')"
 echo ""
-echo "3. Login using Xibo's hardcoded initial startup admin setup:"
+echo "3. Log in using Xibo's factory default user profile setup:"
 echo "   Username : xibo_admin"
 echo "   Password : password"
 echo ""
-echo "4. Once logged in, go to your profile settings and update the password to your chosen secret:"
+echo "4. After logging in, navigate to User Profile settings and change the generic password to your choice:"
 echo "   ${ADMIN_PASS}"
 echo ""
 echo -e "${YELLOW}5. Set XMR Public Address:${NC}"
