@@ -31,7 +31,7 @@ if ! command -v qm &> /dev/null; then
     msg_error "This script must be run on a Proxmox VE host."
 fi
 
-# VM Configuration
+# ====================== VM CONFIG ======================
 read -p "VM ID (e.g. 200): " VMID
 read -p "VM Name (e.g. xibo-server): " VMNAME
 read -p "CPU Cores (default 4): " CPU_CORES; CPU_CORES=${CPU_CORES:-4}
@@ -50,18 +50,18 @@ if qm list | awk '{print $1}' | grep -q "^$VMID$"; then
     msg_error "VM ID $VMID already exists."
 fi
 
-# Network
+# ====================== NETWORK ======================
 echo ""
 read -p "Network? [dhcp/static] (default: dhcp): " NET_TYPE; NET_TYPE=${NET_TYPE:-dhcp}
 
 IPCONFIG=""
 if [[ "$NET_TYPE" == "static" ]]; then
-    read -p "IP/CIDR (e.g. 192.168.1.50/24): " IP_CIDR
+    read -p "IP Address with CIDR (e.g. 192.168.1.50/24): " IP_CIDR
     read -p "Gateway: " GATEWAY
     IPCONFIG="ip=${IP_CIDR},gw=${GATEWAY}"
 fi
 
-# Download Cloud Image
+# ====================== CLOUD IMAGE ======================
 CLOUD_IMAGE="ubuntu-24.04-server-cloudimg-amd64.img"
 TEMPLATE_DIR="/var/lib/vz/template/iso"
 mkdir -p "$TEMPLATE_DIR"
@@ -72,8 +72,9 @@ if [[ ! -f "$TEMPLATE_DIR/$CLOUD_IMAGE" ]]; then
     https://cloud-images.ubuntu.com/releases/24.04/release/$CLOUD_IMAGE
 fi
 
-# Create VM
+# ====================== CREATE VM ======================
 msg_info "Creating VM $VMID ($VMNAME)..."
+
 qm create "$VMID" \
     --name "$VMNAME" \
     --cores "$CPU_CORES" \
@@ -83,7 +84,6 @@ qm create "$VMID" \
     --ostype l26 \
     --agent 1
 
-# Import cloud image
 qm importdisk "$VMID" "$TEMPLATE_DIR/$CLOUD_IMAGE" "$STORAGE"
 qm set "$VMID" --scsi0 "$STORAGE:vm-$VMID-disk-0,discard=on"
 qm set "$VMID" --boot order=scsi0
@@ -93,21 +93,32 @@ if [[ "$NET_TYPE" == "static" ]]; then
     qm set "$VMID" --ipconfig0 "$IPCONFIG"
 fi
 
-# Cloud-init configuration
+# ====================== CLOUD-INIT CONFIG ======================
+msg_info "Configuring cloud-init..."
+
 qm set "$VMID" --ciuser "$VM_USER"
 qm set "$VMID" --cipassword "$VM_PASS"
 
-# Enable SSH password authentication
-qm set "$VMID" --ci-custom user=cloud-init:ssh_pwauth=true
+# Enable SSH password authentication using file method (more compatible)
+cat > /tmp/user-data << EOF
+#cloud-config
+ssh_pwauth: true
+EOF
+
+qm set "$VMID" --ci-custom "user=cloud-init:/tmp/user-data"
 
 # Start VM
 msg_info "Starting VM..."
 qm start "$VMID"
 
 echo ""
-echo -e "${GREEN}VM $VMID ($VMNAME) created and started successfully!${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}   VM created and started successfully! ${NC}"
+echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "Next steps:"
+echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Wait 1-2 minutes for cloud-init to finish"
-echo "2. SSH into the VM using username '$VM_USER' and the password you set"
+echo "2. SSH into the VM using username '$VM_USER' and your password"
 echo "3. Run the Xibo installer inside the VM"
+echo ""
+msg_ok "VM is ready."
