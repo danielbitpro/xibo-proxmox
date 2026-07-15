@@ -125,11 +125,14 @@ msg_info "Configuring cloud-init user and SSH..."
 qm set "$VMID" --ciuser "$VM_USER"
 qm set "$VMID" --cipassword "$VM_PASS"
 
-# Create a local snippet file to force password authentication on Ubuntu 24.04
+# Create a local snippet file that overrides Ubuntu's restrictive SSH configurations
 mkdir -p "$SNIPPET_DIR"
 cat << 'EOF' > "$SNIPPET_DIR/xibo-ssh-patch.yaml"
 #cloud-config
 ssh_pwauth: true
+runcmd:
+  - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config.d/*.conf
+  - systemctl restart sshd
 EOF
 
 # Pass the custom snippet file using Proxmox's correct syntax
