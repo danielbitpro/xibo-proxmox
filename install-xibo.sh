@@ -85,8 +85,15 @@ msg_info "Downloading latest Xibo Docker package..."
 mkdir -p /opt/xibo
 cd /opt/xibo
 
-curl -L -o xibo-docker.tar.gz https://xibosignage.com
-tar -xzf xibo-docker.tar.gz
+# Clean old downloads to avoid deployment directory pollution
+rm -f xibo-docker.zip xibo-docker.tar.gz 2>/dev/null || true
+
+# FIXED: Target package endpoint drops a .zip archive, download it explicitly with correct file extensions
+curl -L -o xibo-docker.zip https://xibosignage.com
+
+# FIXED: Utilizing native unzip tool tracking to unpack the platform configuration directory
+unzip -q xibo-docker.zip
+rm -f xibo-docker.zip
 
 INSTALL_DIR=$(find . -maxdepth 1 -type d -name "xibo-docker-*" | head -n 1)
 cd "$INSTALL_DIR"
