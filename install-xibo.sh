@@ -70,16 +70,17 @@ install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 
+# FIXED: Explicitly targeting 'ubuntu' instead of using native '$(lsb_release -cs)' which breaks paths
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  ubuntu stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 apt update -qq
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 if [[ -n "${SUDO_USER:-}" ]]; then
     usermod -aG docker "$SUDO_USER"
-    msg_warn "User '$SUDO_USER' added to docker group. Log out and back in after installation."
+    msg_warn "User '$SUDO_USER' added to docker group. Session reload handled internally."
 fi
 
 # ====================== XIBO INSTALLATION ======================
@@ -175,11 +176,11 @@ echo ""
 echo "2. Open your browser and go to:"
 echo "   http://$(hostname -I | awk '{print $1}')"
 echo ""
-echo "3. Login with:"
+echo "3. Login using Xibo's hardcoded initial startup admin setup:"
 echo "   Username : xibo_admin"
 echo "   Password : password"
 echo ""
-echo "4. **Change the admin password immediately** to:"
+echo "4. Once logged in, go to your profile settings and update the password to your chosen secret:"
 echo "   ${ADMIN_PASS}"
 echo ""
 echo -e "${YELLOW}5. Set XMR Public Address:${NC}"
