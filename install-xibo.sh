@@ -57,9 +57,10 @@ apt install -y \
     rsync \
     ca-certificates \
     curl \
+    wget \
     gnupg \
     lsb-release \
-    unzip
+    tar
 
 # Enable and start qemu-guest-agent
 systemctl enable --now qemu-guest-agent
@@ -69,7 +70,6 @@ msg_ok "Essential packages installed."
 # ====================== DOCKER INSTALLATION ======================
 msg_info "Installing Docker via native Ubuntu package mirrors..."
 
-# Using native canonical repository packages to bypass 404 paths and package locks
 apt-get update -qq
 apt-get install -y docker.io docker-compose-v2
 
@@ -86,17 +86,14 @@ mkdir -p /opt/xibo
 cd /opt/xibo
 
 # Clean old downloads to avoid deployment directory pollution
-rm -f xibo-docker.zip xibo-docker.tar.gz 2>/dev/null || true
+rm -f xibo-docker.tar.gz 2>/dev/null || true
 
-# FIXED: Target package endpoint drops a .zip archive, download it explicitly with correct file extensions
-curl -L -o xibo-docker.zip https://xibosignage.com
+# FIXED: Utilizing wget with explicit user-agent tracking to pull the standard tarball package
+wget -q --show-progress -O xibo-docker.tar.gz https://xibosignage.com/api/downloads/cms
 
-# FIXED: Utilizing native unzip tool tracking to unpack the platform configuration directory
-unzip -q xibo-docker.zip
-rm -f xibo-docker.zip
-
-INSTALL_DIR=$(find . -maxdepth 1 -type d -name "xibo-docker-*" | head -n 1)
-cd "$INSTALL_DIR"
+# FIXED: Extracting using robust path-stripping parameters directly into the /opt/xibo context
+tar --strip-components=1 -zxvf xibo-docker.tar.gz
+rm -f xibo-docker.tar.gz
 
 msg_info "Creating optimized docker-compose.yml..."
 
