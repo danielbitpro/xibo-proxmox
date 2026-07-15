@@ -119,28 +119,25 @@ if [[ "$NET_TYPE" == "static" && -n "$IPCONFIG" ]]; then
 fi
 
 # ====================== CLOUD-INIT USER CONFIG ======================
-msg_info "Configuring cloud-init user and SSH..."
+msg_info "Configuring cloud-init user and SSH using forum fix..."
 
-# Set core user parameters
-qm set "$VMID" --ciuser "$VM_USER"
-qm set "$VMID" --cipassword "$VM_PASS"
-
-# Create a local snippet file that writes a high-priority override config
-# This stops Ubuntu 24.04 from prioritizing keys over passwords
+# Dynamically generate the custom snippet file based on user input
 mkdir -p "$SNIPPET_DIR"
-cat << 'EOF' > "$SNIPPET_DIR/xibo-ssh-patch.yaml"
+cat << EOF > "$SNIPPET_DIR/${VMID}.yaml"
 #cloud-config
-ssh_pwauth: true
-write_files:
-  - path: /etc/ssh/sshd_config.d/99-enable-password-auth.conf
-    content: |
-      PasswordAuthentication yes
-runcmd:
-  - systemctl restart ssh
+users:
+  - name: ${VM_USER}
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+ssh_pwauth: True
+chpasswd:
+  list: |
+    ${VM_USER}:${VM_PASS}
+  expire: True
 EOF
 
-# Pass the custom snippet file using Proxmox's correct syntax
-qm set "$VMID" --cicustom "user=local:snippets/xibo-ssh-patch.yaml"
+# Attach the custom snippet using the Proxmox 9 syntax
+qm set "$VMID" --cicustom "user=local:snippets/${VMID}.yaml"
 
 # Force cloud-init to regenerate metadata cleanly before boot
 qm cloudinit update "$VMID"
@@ -167,6 +164,7 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Wait 1–2 minutes for cloud-init to complete"
 echo "2. SSH into the VM using the username and password you set"
+echo "   *(Note: The VM will prompt you to change your password on first login)*"
 echo "3. Run the Xibo installer script inside the VM"
 echo ""
 msg_ok "VM is ready."
