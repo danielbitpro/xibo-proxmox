@@ -110,6 +110,10 @@ qm importdisk "$VMID" "$TEMPLATE_DIR/$CLOUD_IMAGE_NAME" "$STORAGE"
 qm set "$VMID" --scsi0 "$STORAGE:vm-$VMID-disk-0,discard=on"
 qm set "$VMID" --boot order=scsi0
 
+# RESIZE FIXED HERE: Apply the target size specified by the user
+msg_info "Resizing root disk to ${DISK_SIZE}G..."
+qm resize "$VMID" scsi0 "${DISK_SIZE}G"
+
 # Add cloud-init drive targeting user selected storage pool
 qm set "$VMID" --ide2 "$STORAGE:cloudinit"
 
@@ -164,7 +168,6 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "1. Wait 1–2 minutes for cloud-init to complete"
 echo "2. SSH into the VM using the username and password you set"
-echo "   *(Note: The VM will prompt you to change your password on first login)*"
 echo "3. Run the Xibo installer script inside the VM"
 echo ""
 msg_ok "VM is ready."
