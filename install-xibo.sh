@@ -32,16 +32,14 @@ if [[ $EUID -ne 0 ]]; then
     msg_error "This script must be run as root or with sudo."
 fi
 
-# Ask for passwords
-echo -e "${YELLOW}Please enter the required passwords:${NC}"
+# Ask for passwords (REMOVED the confusing Xibo admin password prompt)
+echo -e "${YELLOW}Please enter the required database infrastructure password:${NC}"
 read -sp "MySQL password for user 'cms': " MYSQL_PASS
-echo ""
-read -sp "Xibo admin password (desired custom password): " ADMIN_PASS
 echo ""
 echo ""
 
-if [[ -z "$MYSQL_PASS" || -z "$ADMIN_PASS" ]]; then
-    msg_error "Passwords cannot be empty."
+if [[ -z "$MYSQL_PASS" ]]; then
+    msg_error "Password cannot be empty."
 fi
 
 # ====================== SYSTEM UPDATE & ESSENTIAL PACKAGES ======================
@@ -88,10 +86,10 @@ cd /opt/xibo
 # Clean old downloads to avoid deployment directory pollution
 rm -f xibo-docker.tar.gz 2>/dev/null || true
 
-# FIXED: Utilizing wget with explicit user-agent tracking to pull the standard tarball package
-wget -q --show-progress -O xibo-docker.tar.gz https://xibosignage.com/api/downloads/cms
+# Utilizing wget with explicit user-agent tracking to pull the standard tarball package
+wget -q --show-progress -O xibo-docker.tar.gz https://xibosignage.com
 
-# FIXED: Extracting using robust path-stripping parameters directly into the /opt/xibo context
+# Extracting using robust path-stripping parameters directly into the /opt/xibo context
 tar --strip-components=1 -zxvf xibo-docker.tar.gz
 rm -f xibo-docker.tar.gz
 
@@ -180,8 +178,8 @@ echo "3. Log in using Xibo's factory default user profile setup:"
 echo "   Username : xibo_admin"
 echo "   Password : password"
 echo ""
-echo "4. After logging in, navigate to User Profile settings and change the generic password to your choice:"
-echo "   ${ADMIN_PASS}"
+echo "4. **CRITICAL SECURITY STEP**:"
+echo "   Go to your User Profile settings right now and manually change 'password' to your secure custom choice."
 echo ""
 echo -e "${YELLOW}5. Set XMR Public Address:${NC}"
 echo "   Go to: Administration → Settings → Displays"
