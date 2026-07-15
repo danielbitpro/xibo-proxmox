@@ -55,7 +55,6 @@ apt install -y \
     htop \
     nano \
     rsync \
-    openssh-server
 
 # Enable and start qemu-guest-agent
 systemctl enable --now qemu-guest-agent
