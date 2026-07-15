@@ -16,5 +16,5 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/danielbitpro/xibo-proxmo
 ### 2. Install Xibo (Run on the new VM)
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/danielbitpro/xibo-proxmox/main/install-xibo.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/danielbitpro/xibo-proxmox/main/install-xibo.sh)"
 ```
